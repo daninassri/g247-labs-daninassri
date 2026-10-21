@@ -154,3 +154,16 @@ footer {
 #login-form button:hover {
   background-color: #5f3a20;
 }
+
+/* Página de categorías */
+.categorias-page main {
+  display: block;
+  max-width: 800px;
+}
+
+.categorias-page section {
+  margin-bottom: 1.5rem;
+}
+
+
+
