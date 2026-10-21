@@ -72,7 +72,7 @@ Los campos desconocidos no se guardan. Los datos viven en memoria: hay seis rece
 | PATCH | `/recipes/:id` | ninguno | `200` y la receta actualizada | `404`, `400` |
 | DELETE | `/recipes/:id` | ninguno | `204` sin cuerpo | `404` |
 
-Otras respuestas: una ruta inexistente devuelve `404` con `{"error":"Route not found"}`; un cuerpo que no es JSON válido devuelve `400` con `{"error":"Bad request"}`; y un fallo interno devuelve `500` con `{"error":"Server error"}`, sin enviar trazas al cliente. Un `id` que no existe, o que no es un número, devuelve `404`.
+Otras respuestas: una ruta inexistente devuelve `404` con `{"error":"Route not found"}`; un cuerpo que no es JSON válido devuelve `400` con `{"error":"Bad request"}`; y un fallo interno devuelve `500` con `{"error":"Server error"}`, sin enviar trazas al cliente. Un `id` que no existe o no es valido devuelve `404`.
 
 ### Consulta de la colección
 
@@ -87,6 +87,8 @@ Los parámetros de `GET /recipes` se pueden combinar. Primero se filtra, despué
 | `order` | `asc` o `desc` | Sentido de la ordenación. Por defecto `asc`. |
 | `limit` | entero de 1 a 100 | Número máximo de resultados. Sin él, se devuelven todos. |
 | `offset` | entero de 0 o más | Resultados que se saltan. Por defecto 0. |
+
+Con valores iguales en el campo de ordenación, los elementos se ordenan por id ascendente si order=asc y por id descendente si order=desc.
 
 ### Política de parámetros desconocidos o mal formados
 
@@ -150,3 +152,18 @@ El cliente solo construye la consulta (`?search=...&category=...&favorite=true`)
 - `PATCH /recipes/:id` actualiza solo los campos recibidos. Se valida solo lo que llega y el resto de la receta queda igual. Un `PATCH` sin ningún campo válido devuelve `400`.
 
 El cliente usa `PUT` en el formulario de edición, porque envía la receta completa. Usa `PATCH` en el botón de favorita, porque solo cambia un campo.
+
+## Comportamiento en casos límite
+
+- Un `id` de la ruta debe ser un entero positivo sin ceros a la izquierda ni notación científica (`1`, `25`). Cualquier otro valor (`abc`, `01`, `1.0`, `1e0`, `0x1`, `-1`, `1.5`) devuelve `404` con `{"error":"Recipe not found"}`. Los ids no se reutilizan tras un borrado.
+- Si el cuerpo no es JSON válido, la respuesta es `400` antes de comprobar el id. Si el JSON es válido pero el id no existe, gana el `404` sobre la validación del cuerpo.
+- Un `PUT` o `PATCH` rechazado no modifica la receta. Un `PATCH` con un campo válido y otro inválido no aplica ninguno.
+- Un `PATCH` sin campos válidos (cuerpo vacío, solo campos desconocidos o solo `id`) devuelve `400` con `{"errors":[{"field":"body","message":"at least one field is required"}]}`.
+- Un `title` con solo espacios se rechaza (`400`). `minutes` acepta `40.0` (es el entero 40 en JSON); una cadena (`"40"`), `null` o un decimal (`40.5`) devuelven `400`. `favorite: null` devuelve `400`.
+- Los valores de `category` y de los parámetros `sort`, `order` y `favorite` distinguen mayúsculas: `Postre`, `TITLE`, `ASC` o `TRUE` devuelven `400`.
+- Un cuerpo `[]`, vacío o enviado sin `Content-Type: application/json` devuelve `400` con los errores de campos obligatorios. El cuerpo `null` devuelve `400` con `{"error":"Bad request"}`. Con claves duplicadas se toma la última.
+- En `GET /recipes`, `search=` vacío no filtra; `limit=` y `sort=` vacíos devuelven `400`.
+- Los parámetros de consulta solo se validan en `GET /recipes`. En `GET /recipes/stats` y `GET /recipes/:id` se ignoran.
+- Un método no definido para una ruta (por ejemplo `DELETE /recipes` o `POST /recipes/1`) devuelve `404` con `{"error":"Route not found"}`.
+- Con valores iguales en el campo de ordenación, los elementos van por id ascendente si `order=asc` y por id descendente si `order=desc`.
+- `Location` es siempre una ruta relativa (`/recipes/7`). `averageMinutes` se redondea a un decimal y vale `0` sin recetas; `byCategory` incluye siempre las cinco categorías. `title` no tiene longitud máxima.

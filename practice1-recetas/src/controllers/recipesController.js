@@ -4,6 +4,11 @@
 const store = require("../data/store");
 const { validateRecipe, CATEGORIES } = require("../validators/recipeValidator");
 const { parseRecipeQuery } = require("../validators/recipeQuery");
+// Un id válido es un entero positivo escrito de forma canónica (1, 25).
+// Si no lo es devuelve NaN, que no coincide con ningún id y acaba en 404.
+function parseId(raw) {
+  return /^[1-9]\d*$/.test(raw) ? Number(raw) : NaN;
+}
 
 function compareBy(field) {
   return (a, b) => {
@@ -71,7 +76,7 @@ function getStats(req, res) {
 
 // GET /recipes/:id
 function getRecipe(req, res) {
-  const recipe = store.findById(Number(req.params.id));
+  const recipe = store.findById(parseId(req.params.id));
   if (!recipe) {
     return res.status(404).json({ error: "Recipe not found" });
   }
@@ -90,7 +95,7 @@ function createRecipe(req, res) {
 
 // PUT /recipes/:id  (sustituye la receta completa)
 function replaceRecipe(req, res) {
-  const id = Number(req.params.id);
+  const id = parseId(req.params.id);
   if (!store.findById(id)) {
     return res.status(404).json({ error: "Recipe not found" });
   }
@@ -103,7 +108,7 @@ function replaceRecipe(req, res) {
 
 // PATCH /recipes/:id  (cambia solo los campos recibidos)
 function patchRecipe(req, res) {
-  const id = Number(req.params.id);
+  const id = parseId(req.params.id);
   if (!store.findById(id)) {
     return res.status(404).json({ error: "Recipe not found" });
   }
@@ -116,7 +121,7 @@ function patchRecipe(req, res) {
 
 // DELETE /recipes/:id
 function deleteRecipe(req, res) {
-  const removed = store.remove(Number(req.params.id));
+  const removed = store.remove(parseId(req.params.id));
   if (!removed) {
     return res.status(404).json({ error: "Recipe not found" });
   }
