@@ -1,0 +1,21 @@
+{
+  "name": "practice1-recetas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Práctica 1 — Foundations API. API REST de recetas en memoria con cliente web vanilla. G247 CUNEF.",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node --watch src/server.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "supertest": "^7.3.1"
+  }
+}
