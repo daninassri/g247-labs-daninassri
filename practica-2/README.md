@@ -223,7 +223,8 @@ practica-2/
 | Listado | `limit` y `offset` | `page` y `limit`; la respuesta pasa a `{page,limit,total,items}`, con `total` calculado antes de paginar |
 | Receta | `id`, `title`, `minutes`, `favorite`, `category` | Añade `userId` (propietario) |
 | Filtros | `search`, `favorite`, `category`, orden | Añade `userId` |
-| Endpoints nuevos | — | `/auth/register`, `/auth/login`, `/auth/me`, `/recipes/stats` |
+| Endpoints nuevos | — | `/auth/register`, `/auth/login`, `/auth/me` |
+| `/recipes/stats` | Resumen calculado en JavaScript sobre el array | Misma forma de respuesta, calculada con una consulta SQL de agregado (`COUNT`, `AVG`, agrupación por categoría) |
 | Parámetros de consulta inválidos | 400 con todas las incidencias | Se mantiene la misma política |
 | Cliente | JavaScript sin framework | React + Vite en `client/` |
 | Pruebas | Scripts `curl` | `npm test` contra PostgreSQL real, más los scripts de los agentes (`AI/`) |
