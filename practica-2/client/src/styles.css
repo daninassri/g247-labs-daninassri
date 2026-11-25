@@ -100,3 +100,4 @@ a { color: var(--brand-dark); }
   .btn { width: 100%; text-align: center; }
   .session .btn, .actions .btn, .confirm .btn { width: auto; }
 }
+.recipe-card h3, .recipe-card p { margin: 0; font-size: 1rem; }

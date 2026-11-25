@@ -194,38 +194,25 @@ export default function RecipeListPage() {
   /* ---------- Render ---------- */
 
   return (
-    <main>
+    <div>
       <h1>Recetas</h1>
 
-      {/* Resumen */}
-      <section aria-labelledby="stats-title">
-        <h2 id="stats-title">Resumen</h2>
-        {stats.error && !stats.loading ? (
-          <div className="alert" role="alert">
-            <p>No se ha podido cargar el resumen. {errorText(stats.error)}</p>
-            <button type="button" className="link-button" onClick={stats.reload}>
-              Reintentar
-            </button>
-          </div>
-        ) : stats.data === null ? (
-          <p role="status">Cargando resumen…</p>
-        ) : (
-          <dl className="stats">
-            <div>
-              <dt>Recetas</dt>
-              <dd>{numberFormat.format(stats.data.total)}</dd>
-            </div>
-            <div>
-              <dt>Favoritas</dt>
-              <dd>{numberFormat.format(stats.data.favorites)}</dd>
-            </div>
-            <div>
-              <dt>Media de minutos</dt>
-              <dd>{numberFormat.format(stats.data.averageMinutes ?? 0)} min</dd>
-            </div>
-          </dl>
-        )}
-      </section>
+     {/* Resumen */}
+      {stats.error && !stats.loading ? (
+        <div className="alert" role="alert">
+          <p>No se ha podido cargar el resumen. {errorText(stats.error)}</p>
+          <button type="button" className="link-button" onClick={stats.reload}>
+            Reintentar
+          </button>
+        </div>
+      ) : (
+        stats.data && (
+          <p className="stats">
+            {numberFormat.format(stats.data.total)} recetas · {numberFormat.format(stats.data.favorites)} favoritas ·{" "}
+            {numberFormat.format(stats.data.averageMinutes ?? 0)} min de media
+          </p>
+        )
+      )}
 
       {/* Filtros */}
       <form
@@ -401,6 +388,6 @@ export default function RecipeListPage() {
           </>
         )}
       </section>
-    </main>
+    </div>
   );
 }
