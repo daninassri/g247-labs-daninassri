@@ -1,176 +1,406 @@
-// Listado: búsqueda, filtros, orden y paginación en el servidor. Usa el total que devuelve la API.
-// Los filtros viven en la URL (?search=...&page=2), así que se pueden compartir y recargar.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getStats, listRecipes } from "../api/client.js";
-import { useAuth } from "../auth/AuthContext.jsx";
+import { listRecipes, getStats } from "../api/client.js";
 import { useApi } from "../hooks/useApi.js";
+import { useAuth } from "../auth/AuthContext.jsx";
 
-const CATEGORIES = ["entrante", "principal", "postre", "vegetariano", "rapida"];
-const SORTS = [
-  { value: "id:desc", label: "Más recientes" },
-  { value: "title:asc", label: "Título (A-Z)" },
-  { value: "minutes:asc", label: "Más rápidas" },
-  { value: "minutes:desc", label: "Más largas" },
+const PAGE_SIZE = 10;
+const SEARCH_DELAY_MS = 400;
+
+const CATEGORIES = [
+  { value: "entrante", label: "Entrante" },
+  { value: "principal", label: "Principal" },
+  { value: "postre", label: "Postre" },
+  { value: "vegetariano", label: "Vegetariano" },
+  { value: "rapida", label: "Rápida" },
 ];
-const LIMIT = 10;
+
+const SORT_OPTIONS = [
+  { value: "recientes", label: "Más recientes", sort: "id", order: "desc" },
+  { value: "titulo", label: "Título (A-Z)", sort: "title", order: "asc" },
+  { value: "rapidas", label: "Más rápidas", sort: "minutes", order: "asc" },
+  { value: "largas", label: "Más largas", sort: "minutes", order: "desc" },
+];
+const DEFAULT_SORT = SORT_OPTIONS[0];
+
+const numberFormat = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
+
+function categoryLabel(value) {
+  return CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
+
+/** Lee y valida el estado de la URL. Los valores no válidos se ignoran. */
+function readFilters(searchParams) {
+  const category = searchParams.get("category");
+  const sortValue = searchParams.get("sort");
+  const page = Number.parseInt(searchParams.get("page") ?? "", 10);
+
+  return {
+    search: (searchParams.get("q") ?? "").trim(),
+    category: CATEGORIES.some((c) => c.value === category) ? category : "",
+    favorite: searchParams.get("favorite") === "1",
+    mine: searchParams.get("mine") === "1",
+    sort: SORT_OPTIONS.find((o) => o.value === sortValue) ?? DEFAULT_SORT,
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+  };
+}
+
+function errorText(error) {
+  if (error?.status === 0) {
+    return "No se ha podido conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.";
+  }
+  return error?.message || "Ha ocurrido un error inesperado.";
+}
 
 export default function RecipeListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const [params, setParams] = useSearchParams();
 
-  const search = params.get("search") ?? "";
-  const category = params.get("category") ?? "";
-  const favorite = params.get("favorite") ?? "";
-  const mine = params.get("mine") === "true";
-  const sortValue = params.get("sort") ?? "id:desc";
-  const page = Math.max(1, Number(params.get("page")) || 1);
+  const { search, category, favorite, sort, page, ...rest } = readFilters(searchParams);
+  // "Solo las mías" solo tiene efecto si hay sesión.
+  const mine = rest.mine && Boolean(user);
+  const userId = mine ? user.id : undefined;
+  const hasFilters = Boolean(search || category || favorite || mine);
 
-  function update(changes, { push = false } = {}) {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        for (const [key, value] of Object.entries(changes)) {
-          if (value === "" || value === false || value == null) next.delete(key);
-          else next.set(key, String(value));
-        }
-        if (!("page" in changes)) next.delete("page"); // cualquier filtro vuelve a la página 1
-        return next;
-      },
-      { replace: !push }
-    );
+  /* ---------- Escritura en la URL ---------- */
+
+  const updateParams = useCallback(
+    (changes, { resetPage = true, replace = false } = {}) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [key, value] of Object.entries(changes)) {
+            if (value === "" || value == null || value === false) next.delete(key);
+            else next.set(key, String(value));
+          }
+          if (resetPage) next.delete("page");
+          return next;
+        },
+        { replace }
+      );
+    },
+    [setSearchParams]
+  );
+
+  /* ---------- Búsqueda con debounce ---------- */
+
+  const [searchInput, setSearchInput] = useState(search);
+  const lastCommittedSearch = useRef(search);
+
+  // Si la URL cambia desde fuera (atrás/adelante, quitar filtros), sincroniza el campo.
+  useEffect(() => {
+    if (search !== lastCommittedSearch.current) {
+      lastCommittedSearch.current = search;
+      setSearchInput(search);
+    }
+  }, [search]);
+
+  // Aplica la búsqueda a la URL cuando el usuario deja de escribir.
+  useEffect(() => {
+    const value = searchInput.trim();
+    if (value === lastCommittedSearch.current) return undefined;
+    const timer = setTimeout(() => {
+      lastCommittedSearch.current = value;
+      updateParams({ q: value }, { replace: true });
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput, updateParams]);
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const value = searchInput.trim();
+    if (value !== lastCommittedSearch.current) {
+      lastCommittedSearch.current = value;
+      updateParams({ q: value });
+    }
   }
 
-  // Búsqueda con espera de 300 ms para no consultar en cada tecla
-  const [searchText, setSearchText] = useState(search);
-  useEffect(() => {
-    if (searchText.trim() === search) return;
-    const timer = setTimeout(() => update({ search: searchText.trim() }), 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText]);
+  function clearFilters() {
+    lastCommittedSearch.current = "";
+    setSearchInput("");
+    setSearchParams((prev) => {
+      const next = new URLSearchParams();
+      const currentSort = prev.get("sort");
+      if (currentSort) next.set("sort", currentSort); // la ordenación no es un filtro
+      return next;
+    });
+  }
 
-  const [sort, order] = sortValue.split(":");
-  const { data, loading, error, reload } = useApi(
+  /* ---------- Paginación y foco ---------- */
+
+  const resultsHeadingRef = useRef(null);
+  const focusResultsAfterLoad = useRef(false);
+
+  function goToPage(target) {
+    focusResultsAfterLoad.current = true;
+    updateParams({ page: target > 1 ? target : "" }, { resetPage: false });
+  }
+
+  /* ---------- Datos ---------- */
+
+  const list = useApi(
     () =>
       listRecipes({
         search: search || undefined,
         category: category || undefined,
         favorite: favorite || undefined,
-        userId: mine && user ? user.id : undefined,
-        sort,
-        order,
+        userId,
+        sort: sort.sort,
+        order: sort.order,
         page,
-        limit: LIMIT,
+        limit: PAGE_SIZE,
       }),
-    [search, category, favorite, mine, user?.id, sortValue, page]
+    [search, category, favorite, userId, sort.value, page]
   );
-  const stats = useApi(getStats, []);
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / LIMIT)) : 1;
-  const hasFilters = Boolean(search || category || favorite || mine);
+  const stats = useApi(() => getStats(), []);
 
-  let content;
-  if (error) {
-    content = (
-      <div className="alert" role="alert">
-        <p>No se pudieron cargar las recetas: {error.message}</p>
-        <button type="button" className="btn" onClick={reload}>Reintentar</button>
-      </div>
-    );
-  } else if (loading && !data) {
-    content = <p role="status">Cargando recetas...</p>;
-  } else if (data.items.length === 0) {
-    content =
-      data.total === 0 ? (
-        <p className="empty">
-          No hay recetas con estos filtros.{" "}
-          {hasFilters && (
-            <button type="button" className="link-button" onClick={() => { setSearchText(""); setParams({}); }}>
-              Quitar filtros
-            </button>
-          )}
-        </p>
-      ) : (
-        <p className="empty">
-          Esta página no existe.{" "}
-          <button type="button" className="link-button" onClick={() => update({}, { push: true })}>
-            Ir a la primera
-          </button>
-        </p>
-      );
-  } else {
-    content = (
-      <>
-        <ul className="recipe-list" aria-busy={loading}>
-          {data.items.map((recipe) => (
-            <li key={recipe.id} className="recipe-card">
-              <Link to={"/recipes/" + recipe.id} className="recipe-title">{recipe.title}</Link>
-              <span className="badge">{recipe.category}</span>
-              <span>{recipe.minutes} min</span>
-              {recipe.favorite && <span className="star" title="Favorita" aria-label="Favorita">★</span>}
-            </li>
-          ))}
-        </ul>
-        <nav className="pagination" aria-label="Paginación">
-          <button type="button" className="btn btn-secondary" disabled={page <= 1}
-            onClick={() => update({ page: page - 1 }, { push: true })}>
-            Anterior
-          </button>
-          <span role="status">Página {page} de {totalPages} · {data.total} recetas</span>
-          <button type="button" className="btn btn-secondary" disabled={page >= totalPages}
-            onClick={() => update({ page: page + 1 }, { push: true })}>
-            Siguiente
-          </button>
-        </nav>
-      </>
-    );
-  }
+  useEffect(() => {
+    if (focusResultsAfterLoad.current && !list.loading) {
+      focusResultsAfterLoad.current = false;
+      resultsHeadingRef.current?.focus();
+    }
+  }, [list.loading, page]);
+
+  /* ---------- Estado de la vista ---------- */
+
+  const total = list.data?.total ?? 0;
+  const items = list.data?.items ?? [];
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const isUpdating = list.loading && list.data !== null;
+
+  let view;
+  if (list.error && !list.loading) view = "error";
+  else if (list.data === null) view = "loading";
+  else if (total === 0 && !list.loading) view = "empty";
+  else if (!list.loading && page > totalPages) view = "out-of-range";
+  else view = "success";
+
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = from + items.length - 1;
+
+  let statusMessage = "";
+  if (view === "loading") statusMessage = "Cargando recetas…";
+  else if (isUpdating) statusMessage = "Actualizando resultados…";
+  else if (view === "empty")
+    statusMessage = hasFilters
+      ? "No hay recetas que coincidan con los filtros."
+      : "Todavía no hay recetas.";
+  else if (view === "out-of-range")
+    statusMessage = `La página ${page} no existe. Hay ${totalPages} ${totalPages === 1 ? "página" : "páginas"}.`;
+  else if (view === "success")
+    statusMessage = `Mostrando ${from}–${to} de ${total} ${total === 1 ? "receta" : "recetas"}. Página ${page} de ${totalPages}.`;
+
+  /* ---------- Render ---------- */
 
   return (
-    <section>
+    <main>
       <h1>Recetas</h1>
 
-      {stats.data && (
-        <p className="stats">
-          {stats.data.total} recetas · {stats.data.favorites} favoritas · {String(stats.data.averageMinutes).replace(".", ",")} min de media
-        </p>
-      )}
-
-      <form className="filters" role="search" onSubmit={(e) => e.preventDefault()}>
-        <div className="field">
-          <label htmlFor="search">Buscar</label>
-          <input id="search" type="search" value={searchText} placeholder="Título de la receta"
-            onChange={(e) => setSearchText(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="category">Categoría</label>
-          <select id="category" value={category} onChange={(e) => update({ category: e.target.value })}>
-            <option value="">Todas</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="sort">Ordenar por</label>
-          <select id="sort" value={sortValue} onChange={(e) => update({ sort: e.target.value === "id:desc" ? "" : e.target.value })}>
-            {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-        <div className="field field-check">
-          <input id="favorite" type="checkbox" checked={favorite === "true"}
-            onChange={(e) => update({ favorite: e.target.checked ? "true" : "" })} />
-          <label htmlFor="favorite">Solo favoritas</label>
-        </div>
-        {user && (
-          <div className="field field-check">
-            <input id="mine" type="checkbox" checked={mine}
-              onChange={(e) => update({ mine: e.target.checked ? "true" : "" })} />
-            <label htmlFor="mine">Solo las mías</label>
+      {/* Resumen */}
+      <section aria-labelledby="stats-title">
+        <h2 id="stats-title">Resumen</h2>
+        {stats.error && !stats.loading ? (
+          <div className="alert" role="alert">
+            <p>No se ha podido cargar el resumen. {errorText(stats.error)}</p>
+            <button type="button" className="link-button" onClick={stats.reload}>
+              Reintentar
+            </button>
           </div>
+        ) : stats.data === null ? (
+          <p role="status">Cargando resumen…</p>
+        ) : (
+          <dl className="stats">
+            <div>
+              <dt>Recetas</dt>
+              <dd>{numberFormat.format(stats.data.total)}</dd>
+            </div>
+            <div>
+              <dt>Favoritas</dt>
+              <dd>{numberFormat.format(stats.data.favorites)}</dd>
+            </div>
+            <div>
+              <dt>Media de minutos</dt>
+              <dd>{numberFormat.format(stats.data.averageMinutes ?? 0)} min</dd>
+            </div>
+          </dl>
+        )}
+      </section>
+
+      {/* Filtros */}
+      <form
+        className="filters"
+        role="search"
+        aria-label="Filtrar recetas"
+        onSubmit={handleSubmit}
+      >
+        <div className="field">
+          <label htmlFor="recipe-search">Buscar por título</label>
+          <input
+            id="recipe-search"
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="recipe-category">Categoría</label>
+          <select
+            id="recipe-category"
+            value={category}
+            onChange={(e) => updateParams({ category: e.target.value })}
+          >
+            <option value="">Todas</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="recipe-sort">Ordenar por</label>
+          <select
+            id="recipe-sort"
+            value={sort.value}
+            onChange={(e) =>
+              updateParams({ sort: e.target.value === DEFAULT_SORT.value ? "" : e.target.value })
+            }
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field-check">
+          <input
+            id="recipe-favorite"
+            type="checkbox"
+            checked={favorite}
+            onChange={(e) => updateParams({ favorite: e.target.checked ? "1" : "" })}
+          />
+          <label htmlFor="recipe-favorite">Solo favoritas</label>
+        </div>
+
+        {user && (
+          <div className="field-check">
+            <input
+              id="recipe-mine"
+              type="checkbox"
+              checked={mine}
+              onChange={(e) => updateParams({ mine: e.target.checked ? "1" : "" })}
+            />
+            <label htmlFor="recipe-mine">Solo las mías</label>
+          </div>
+        )}
+
+        <button type="submit" className="btn">
+          Buscar
+        </button>
+        {hasFilters && (
+          <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+            Quitar filtros
+          </button>
         )}
       </form>
 
-      {content}
-    </section>
+      {/* Resultados */}
+      <section aria-labelledby="results-title" aria-busy={list.loading}>
+        <h2 id="results-title" ref={resultsHeadingRef} tabIndex={-1}>
+          Resultados
+        </h2>
+
+        {/* Región viva siempre montada para que los cambios se anuncien */}
+        <p role="status">{statusMessage}</p>
+
+        {view === "error" && (
+          <div className="alert" role="alert">
+            <p>No se han podido cargar las recetas. {errorText(list.error)}</p>
+            <button type="button" className="btn" onClick={list.reload}>
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {view === "empty" && (
+          <div className="empty">
+            {hasFilters ? (
+              <>
+                <p>Prueba con otra búsqueda o quita los filtros.</p>
+                <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+                  Quitar filtros
+                </button>
+              </>
+            ) : (
+              <p>Cuando se añadan recetas, aparecerán aquí.</p>
+            )}
+          </div>
+        )}
+
+        {view === "out-of-range" && (
+          <div className="empty">
+            <button type="button" className="btn" onClick={() => goToPage(totalPages)}>
+              Ir a la última página ({totalPages})
+            </button>{" "}
+            <button type="button" className="btn btn-secondary" onClick={() => goToPage(1)}>
+              Ir a la primera página
+            </button>
+          </div>
+        )}
+
+        {view === "success" && (
+          <>
+            <ul className="recipe-list">
+              {items.map((recipe) => (
+                <li key={recipe.id} className="recipe-card">
+                  <h3 className="recipe-title">
+                    <Link to={`/recipes/${recipe.id}`}>{recipe.title}</Link>
+                  </h3>
+                  <p>
+                    <span className="badge">{categoryLabel(recipe.category)}</span>{" "}
+                    <span>{recipe.minutes} min</span>{" "}
+                    {recipe.favorite && (
+                      <span className="star" role="img" aria-label="Favorita" title="Favorita">
+                        ★
+                      </span>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            {totalPages > 1 && (
+              <nav className="pagination" aria-label="Paginación de recetas">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1 || list.loading}
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {page} de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages || list.loading}
+                >
+                  Siguiente
+                </button>
+              </nav>
+            )}
+          </>
+        )}
+      </section>
+    </main>
   );
 }
