@@ -1,0 +1,177 @@
+
+## GET id inexistente (amb. 1)
+   esperado según el código: 404 {"error":"Recipe not found"}
+{"error":"Recipe not found"}
+   [HTTP 404]
+
+## PATCH a id inexistente con cuerpo inválido (amb. 11)
+   esperado según el código: 404, gana el 404
+{"error":"Recipe not found"}
+   [HTTP 404]
+
+## PUT a id inexistente con JSON roto (amb. 11)
+   esperado según el código: 400 Bad request, el JSON se procesa antes que la ruta
+{"error":"Bad request"}
+   [HTTP 400]
+
+## PATCH con cuerpo vacío (amb. 2)
+   esperado según el código: 400 con field body: at least one field is required
+{"errors":[{"field":"body","message":"at least one field is required"}]}
+   [HTTP 400]
+
+## PATCH con solo id (amb. 10)
+   esperado según el código: igual que el anterior: id no cuenta como campo válido
+{"errors":[{"field":"body","message":"at least one field is required"}]}
+   [HTTP 400]
+
+## title solo espacios (amb. 5)
+   esperado según el código: 400 title must be a non-empty string
+{"errors":[{"field":"title","message":"title must be a non-empty string"}]}
+   [HTTP 400]
+
+## category con mayúscula (amb. 6)
+   esperado según el código: 400 category must be one of
+{"errors":[{"field":"category","message":"category must be one of: entrante, principal, postre, vegetariano, rapida"}]}
+   [HTTP 400]
+
+## minutes 40.0 (amb. 7)
+   esperado según el código: 201, el JSON 40.0 es el entero 40
+{"title":"Cuarenta","minutes":40,"favorite":false,"category":"rapida","id":7}
+   [HTTP 201]
+
+## minutes null (amb. 7)
+   esperado según el código: 400 sobre minutes
+{"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+   [HTTP 400]
+
+## favorite null (amb. 7)
+   esperado según el código: 400 sobre favorite
+{"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+   [HTTP 400]
+
+## title numérico (amb. 7)
+   esperado según el código: 400 sobre title
+{"errors":[{"field":"title","message":"title must be a non-empty string"}]}
+   [HTTP 400]
+
+## sort en mayúsculas (amb. 6)
+   esperado según el código: 400 sobre sort
+{"errors":[{"field":"sort","message":"sort must be one of: id, title, minutes, favorite, category"}]}
+   [HTTP 400]
+
+## order en mayúsculas (amb. 6)
+   esperado según el código: 400 sobre order
+{"errors":[{"field":"order","message":"order must be asc or desc"}]}
+   [HTTP 400]
+
+## favorite en mayúsculas (amb. 6)
+   esperado según el código: 400 sobre favorite
+{"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+   [HTTP 400]
+
+## PATCH con minutes válido y favorite inválido (amb. 9)
+   esperado según el código: 400 solo sobre favorite
+{"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+   [HTTP 400]
+
+## GET de esa receta (amb. 9)
+   esperado según el código: minutes sigue en 15, no se aplicó nada
+{"id":2,"title":"Gazpacho andaluz","minutes":15,"favorite":false,"category":"entrante"}
+   [HTTP 200]
+
+## GET /recipes/01 (amb. 12)
+   esperado según el código: 200 con la receta 1: el id no se interpreta de forma estricta
+{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"}
+   [HTTP 200]
+
+## GET /recipes/1.0 (amb. 12)
+   esperado según el código: 200 con la receta 1: el id no se interpreta de forma estricta
+{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"}
+   [HTTP 200]
+
+## GET /recipes/1e0 (amb. 12)
+   esperado según el código: 200 con la receta 1: el id no se interpreta de forma estricta
+{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"}
+   [HTTP 200]
+
+## GET /recipes/0x1 (amb. 12)
+   esperado según el código: 200 con la receta 1: el id no se interpreta de forma estricta
+{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"}
+   [HTTP 200]
+
+## GET /recipes/1.5 (amb. 12)
+   esperado según el código: 404
+{"error":"Recipe not found"}
+   [HTTP 404]
+
+## GET /recipes/-1 (amb. 12)
+   esperado según el código: 404
+{"error":"Recipe not found"}
+   [HTTP 404]
+
+## search vacío (amb. 13)
+   esperado según el código: 200 y todas las recetas, no filtra
+[{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"},{"id":2,"title":"Gazpacho andaluz","minutes":15,"favorite":false,"category":"entrante"},{"id":3,"title":"Paella valenciana","minutes":90,"favorite":true,"category":"principal"},{"id":4,"title":"Crema catalana","minutes":30,"favorite":false,"category":"postre"},{"id":5,"title":"Ensalada de garbanzos","minutes":20,"favorite":false,"category":"vegetariano"},{"id":6,"title":"Tostada con tomate","minutes":5,"favorite":true,"category":"rapida"},{"title":"Cuarenta","minutes":40,"favorite":false,"category":"rapida","id":7}]
+   [HTTP 200]
+
+## limit vacío (amb. 13)
+   esperado según el código: 400 sobre limit
+{"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+   [HTTP 400]
+
+## sort vacío (amb. 13)
+   esperado según el código: 400 sobre sort
+{"errors":[{"field":"sort","message":"sort must be one of: id, title, minutes, favorite, category"}]}
+   [HTTP 400]
+
+## stats con parámetro desconocido (amb. 14)
+   esperado según el código: 200, se ignora
+{"total":7,"favorites":3,"averageMinutes":35,"byCategory":{"entrante":1,"principal":2,"postre":1,"vegetariano":1,"rapida":2}}
+   [HTTP 200]
+
+## GET por id con parámetro desconocido (amb. 14)
+   esperado según el código: 200, se ignora
+{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"}
+   [HTTP 200]
+
+## POST sin cuerpo (amb. 15)
+   esperado según el código: 400 con los tres errores de campo obligatorio
+{"errors":[{"field":"title","message":"title is required"},{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+   [HTTP 400]
+
+## POST con array (amb. 15)
+   esperado según el código: 400 con los tres errores de campo obligatorio
+{"errors":[{"field":"title","message":"title is required"},{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+   [HTTP 400]
+
+## POST con null (amb. 15)
+   esperado según el código: 400 Bad request
+{"error":"Bad request"}
+   [HTTP 400]
+
+## POST con claves duplicadas (amb. 15)
+   esperado según el código: 201 y gana la última clave: title Segundo
+{"title":"Segundo","minutes":10,"favorite":false,"category":"rapida","id":8}
+   [HTTP 201]
+
+## POST sin Content-Type JSON (amb. 15)
+   esperado según el código: 400 con los tres errores de campo obligatorio, el cuerpo no se lee
+{"errors":[{"field":"title","message":"title is required"},{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+   [HTTP 400]
+
+## DELETE sobre la colección (amb. 16)
+   esperado según el código: 404 Route not found
+{"error":"Route not found"}
+   [HTTP 404]
+
+## POST sobre un id (amb. 16)
+   esperado según el código: 404 Route not found
+{"error":"Route not found"}
+   [HTTP 404]
+
+## stats con la colección vacía (amb. 17)
+   esperado según el código: 200 con total 0, averageMinutes 0 y las cinco categorías a 0
+{"total":0,"favorites":0,"averageMinutes":0,"byCategory":{"entrante":0,"principal":0,"postre":0,"vegetariano":0,"rapida":0}}
+   [HTTP 200]
+
+Fin. Reinicia el servidor: Ctrl+C y npm start.

@@ -1,0 +1,274 @@
+API: http://localhost:3000   token: qa179260322622623
+
+== 1. POST /recipes ==
+OK    | POST válido: Location y favorite por defecto | esperado 201 | real 201
+        esperado: {"title":"<T> Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":<id>}; mismo id que en Location
+        cuerpo:   {"title":"qa179260322622623 Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":7}
+        location: /recipes/7
+OK    | POST recorta espacios del título | esperado 201 | real 201
+        esperado: "title":"<T> Trim"
+        cuerpo:   {"title":"qa179260322622623 Trim","minutes":10,"favorite":false,"category":"rapida","id":8}
+OK    | POST minutes=1 (límite inferior) | esperado 201 | real 201
+OK    | POST minutes=600 (límite superior) | esperado 201 | real 201
+OK    | POST cuerpo vacío: todos los errores a la vez | esperado 400 | real 400
+        esperado: errors con exactamente 3 entradas: "title is required", "minutes is required", "category is required"
+        cuerpo:   {"errors":[{"field":"title","message":"title is required"},{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+OK    | POST title vacío | esperado 400 | real 400
+        esperado: errors con field "title"
+        cuerpo:   {"errors":[{"field":"title","message":"title must be a non-empty string"}]}
+OK    | POST minutes=0 | esperado 400 | real 400
+        esperado: errors con field "minutes"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | POST minutes=601 | esperado 400 | real 400
+        esperado: errors con field "minutes"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | POST minutes=40.5 | esperado 400 | real 400
+        esperado: errors con field "minutes"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | POST minutes="40" | esperado 400 | real 400
+        esperado: errors con field "minutes"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | POST favorite="true" | esperado 400 | real 400
+        esperado: errors con field "favorite"
+        cuerpo:   {"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+OK    | POST category=postres | esperado 400 | real 400
+        esperado: errors con field "category"
+        cuerpo:   {"errors":[{"field":"category","message":"category must be one of: entrante, principal, postre, vegetariano, rapida"}]}
+OK    | POST cuatro campos inválidos | esperado 400 | real 400
+        esperado: cuatro entradas: title, minutes, favorite, category
+        cuerpo:   {"errors":[{"field":"title","message":"title must be a non-empty string"},{"field":"minutes","message":"minutes must be an integer between 1 and 600"},{"field":"favorite","message":"favorite must be true or false"},{"field":"category","message":"category must be one of: entrante, principal, postre, vegetariano, rapida"}]}
+OK    | POST JSON mal formado | esperado 400 | real 400
+        esperado: {"error":"Bad request"}
+        cuerpo:   {"error":"Bad request"}
+OK    | POST con id del cliente y campo desconocido | esperado 201 | real 201
+        esperado: id generado por el servidor (≠ 999999), sin "color"
+        cuerpo:   {"title":"qa179260322622623 Ident","minutes":5,"favorite":false,"category":"rapida","id":11}
+        location: /recipes/11
+OK    | GET de la receta creada con id del cliente | esperado 200 | real 200
+        esperado: mismo id que Location, sin "color"
+        cuerpo:   {"title":"qa179260322622623 Ident","minutes":5,"favorite":false,"category":"rapida","id":11}
+
+== 2. GET /recipes/:id ==
+OK    | GET receta existente | esperado 200 | real 200
+        esperado: {"title":"<T> Leer","minutes":15,"favorite":false,"category":"entrante","id":12}
+        cuerpo:   {"title":"qa179260322622623 Leer","minutes":15,"favorite":false,"category":"entrante","id":12}
+OK    | GET id inexistente | esperado 404 | real 404
+OK    | GET id no numérico | esperado 404 | real 404
+
+== 3. PUT /recipes/:id ==
+OK    | PUT completo sustituye y conserva id | esperado 200 | real 200
+        esperado: {"title":"<T> Put2","minutes":30,"favorite":true,"category":"principal","id":14}
+        cuerpo:   {"title":"qa179260322622623 Put2","minutes":30,"favorite":true,"category":"principal","id":14}
+OK    | PUT sin favorite lo restablece | esperado 200 | real 200
+        esperado: "favorite":false
+        cuerpo:   {"title":"qa179260322622623 Put3","minutes":30,"favorite":false,"category":"principal","id":14}
+OK    | PUT incompleto | esperado 400 | real 400
+        esperado: errors con field "minutes" y "category"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+OK    | GET tras PUT rechazado | esperado 200 | real 200
+        esperado: sigue "title":"<T> Put3"
+        cuerpo:   {"title":"qa179260322622623 Put3","minutes":30,"favorite":false,"category":"principal","id":14}
+OK    | PUT con otro id en el cuerpo | esperado 200 | real 200
+        esperado: "id":14
+        cuerpo:   {"title":"qa179260322622623 Put4","minutes":30,"favorite":false,"category":"principal","id":14}
+OK    | PUT con campo desconocido | esperado 200 | real 200
+        esperado: sin "color"
+        cuerpo:   {"title":"qa179260322622623 Put5","minutes":30,"favorite":false,"category":"principal","id":14}
+OK    | PUT id inexistente | esperado 404 | real 404
+OK    | PUT id no numérico | esperado 404 | real 404
+OK    | PUT JSON mal formado | esperado 400 | real 400
+        esperado: {"error":"Bad request"}
+        cuerpo:   {"error":"Bad request"}
+
+== 4. PATCH /recipes/:id ==
+OK    | PATCH cambia solo minutes | esperado 200 | real 200
+        esperado: {"title":"<T> Patch","minutes":45,"favorite":true,"category":"postre","id":15}
+        cuerpo:   {"title":"qa179260322622623 Patch","minutes":45,"favorite":true,"category":"postre","id":15}
+OK    | PATCH recorta espacios del título | esperado 200 | real 200
+        esperado: "title":"<T> Patch2"; resto sin cambios
+        cuerpo:   {"title":"qa179260322622623 Patch2","minutes":45,"favorite":true,"category":"postre","id":15}
+OK    | PATCH cuerpo vacío | esperado 400 | real 400
+OK    | PATCH solo campos desconocidos | esperado 400 | real 400
+OK    | PATCH minutes=0 | esperado 400 | real 400
+        esperado: errors con field "minutes"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | PATCH favorite="no" | esperado 400 | real 400
+        esperado: errors con field "favorite"
+        cuerpo:   {"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+OK    | GET tras PATCH rechazados | esperado 200 | real 200
+        esperado: minutes 45 y favorite true
+        cuerpo:   {"title":"qa179260322622623 Patch2","minutes":45,"favorite":true,"category":"postre","id":15}
+OK    | PATCH campo válido + desconocido | esperado 200 | real 200
+        esperado: "favorite":false, sin "color"
+        cuerpo:   {"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15}
+OK    | PATCH id inexistente | esperado 404 | real 404
+OK    | PATCH id no numérico | esperado 404 | real 404
+OK    | PATCH JSON mal formado | esperado 400 | real 400
+        esperado: {"error":"Bad request"}
+        cuerpo:   {"error":"Bad request"}
+
+== 5. PUT frente a PATCH ==
+OK    | PUT parcial {minutes:15} | esperado 400 | real 400
+        esperado: errors con field "title" y "category"
+        cuerpo:   {"errors":[{"field":"title","message":"title is required"},{"field":"category","message":"category is required"}]}
+OK    | PATCH parcial {minutes:15} | esperado 200 | real 200
+        esperado: minutes 15, resto sin cambios
+        cuerpo:   {"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17}
+OK    | PUT sin favorite (A) | esperado 200 | real 200
+        esperado: "favorite":false
+        cuerpo:   {"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16}
+OK    | PATCH sin favorite (B) | esperado 200 | real 200
+        esperado: "favorite":true
+        cuerpo:   {"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17}
+
+== 6. DELETE /recipes/:id ==
+OK    | DELETE existente | esperado 204 | real 204
+        esperado: sin cuerpo
+        cuerpo:   
+OK    | GET tras DELETE | esperado 404 | real 404
+OK    | DELETE repetido | esperado 404 | real 404
+OK    | DELETE id no numérico | esperado 404 | real 404
+
+== 7. Filtros ==
+        ids creados: R1=19 R2=20 R3=21 R4=22
+OK    | search parcial y sin mayúsculas | esperado 200 | real 200
+        esperado: [19]
+        cuerpo:   [{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19}]
+        jq map(.id): [19]
+OK    | search + category=postre + sort=id | esperado 200 | real 200
+        esperado: [19,20,22]
+        cuerpo:   [{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq map(.id): [15,16,17,19,20,22]
+OK    | search del token completo | esperado 200 | real 200
+        esperado: títulos del token, ordenados por id
+        cuerpo:   [{"title":"qa179260322622623 Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":7},{"title":"qa179260322622623 Trim","minutes":10,"favorite":false,"category":"rapida","id":8},{"title":"qa179260322622623 Min","minutes":1,"favorite":false,"category":"rapida","id":9},{"title":"qa179260322622623 Max","minutes":600,"favorite":false,"category":"principal","id":10},{"title":"qa179260322622623 Ident","minutes":5,"favorite":false,"category":"rapida","id":11},{"title":"qa179260322622623 Leer","minutes":15,"favorite":false,"category":"entrante","id":12},{"title":"qa179260322622623 Put5","minutes":30,"favorite":false,"category":"principal","id":14},{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20},{"title":"qa179260322622623 Charlie","minutes":50,"favorite":true,"category":"principal","id":21},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq map(.title|split(" ")|last): ["Pisto","Trim","Min","Max","Ident","Leer","Put5","Patch2","CmpA","CmpB","Alfa","Bravo","Charlie","Delta"]
+OK    | search sin coincidencias | esperado 200 | real 200
+        esperado: []
+        cuerpo:   []
+OK    | search + category + favorite | esperado 200 | real 200
+        esperado: [19,22]
+        cuerpo:   [{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq map(.id): [17,19,22]
+OK    | search + favorite=false + category=postre | esperado 200 | real 200
+        esperado: [20]
+        cuerpo:   [{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20}]
+        jq map(.id): [15,16,20]
+OK    | search + category=principal | esperado 200 | real 200
+        esperado: recetas principal del token (Charlie, Max, Put5)
+        cuerpo:   [{"title":"qa179260322622623 Max","minutes":600,"favorite":false,"category":"principal","id":10},{"title":"qa179260322622623 Put5","minutes":30,"favorite":false,"category":"principal","id":14},{"title":"qa179260322622623 Charlie","minutes":50,"favorite":true,"category":"principal","id":21}]
+        jq map(.title|split(" ")|last): ["Max","Put5","Charlie"]
+
+== 8. Ordenación ==
+OK    | sort=minutes asc (postre) | esperado 200 | real 200
+        esperado: Bravo(10), Delta(20), Alfa(30) en ese orden relativo; minutes no decreciente
+        cuerpo:   [{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15}]
+        jq map(.title|split(" ")|last): ["Bravo","CmpA","CmpB","Delta","Alfa","Patch2"]
+OK    | sort=minutes desc | esperado 200 | real 200
+        esperado: minutes no creciente
+        cuerpo:   [{"title":"qa179260322622623 Max","minutes":600,"favorite":false,"category":"principal","id":10},{"title":"qa179260322622623 Charlie","minutes":50,"favorite":true,"category":"principal","id":21},{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15},{"title":"qa179260322622623 Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":7},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Put5","minutes":30,"favorite":false,"category":"principal","id":14},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 Leer","minutes":15,"favorite":false,"category":"entrante","id":12},{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20},{"title":"qa179260322622623 Trim","minutes":10,"favorite":false,"category":"rapida","id":8},{"title":"qa179260322622623 Ident","minutes":5,"favorite":false,"category":"rapida","id":11},{"title":"qa179260322622623 Min","minutes":1,"favorite":false,"category":"rapida","id":9}]
+        jq map(.minutes): [600,50,45,40,30,30,20,15,15,15,10,10,5,1]
+OK    | sort=title asc | esperado 200 | real 200
+        esperado: ["Alfa","Delta"]
+        cuerpo:   [{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq map(.title|split(" ")|last): ["Alfa","CmpB","Delta"]
+OK    | sort=title desc | esperado 200 | real 200
+        esperado: ["Delta","Alfa"]
+        cuerpo:   [{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19}]
+        jq map(.title|split(" ")|last): ["Delta","CmpB","Alfa"]
+OK    | order=desc sin sort (por id) | esperado 200 | real 200
+        esperado: [22,19]
+        cuerpo:   [{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17}]
+        jq map(.id): [22,19,17]
+
+== 9. Paginación ==
+OK    | limit=2 tras filtrar y ordenar | esperado 200 | real 200
+        esperado: ["CmpB","Delta"]
+        cuerpo:   [{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq map(.title|split(" ")|last): ["CmpB","Delta"]
+OK    | limit=2&offset=1 | esperado 200 | real 200
+        esperado: ["Delta","Alfa"]
+        cuerpo:   [{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19}]
+        jq map(.title|split(" ")|last): ["Delta","Alfa"]
+OK    | offset=2 sin limit | esperado 200 | real 200
+        esperado: ["Alfa"]
+        cuerpo:   [{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19}]
+        jq map(.title|split(" ")|last): ["Alfa"]
+OK    | offset más allá del final | esperado 200 | real 200
+        esperado: []
+        cuerpo:   []
+OK    | limit=1 | esperado 200 | real 200
+        esperado: longitud 1
+        cuerpo:   [{"title":"qa179260322622623 Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":7}]
+        jq length: 1
+OK    | limit=100 | esperado 200 | real 200
+
+== 10. Parámetros de consulta inválidos ==
+OK    | ejemplo del contrato (foo, sort, limit) | esperado 400 | real 400
+        esperado: 3 entradas: foo "unknown query parameter", sort "sort must be one of: ...", limit "limit must be an integer between 1 and 100" (cualquier orden)
+        cuerpo:   {"errors":[{"field":"foo","message":"unknown query parameter"},{"field":"sort","message":"sort must be one of: id, title, minutes, favorite, category"},{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | limit=0 | esperado 400 | real 400
+        esperado: field "limit", "limit must be an integer between 1 and 100"
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | limit=101 | esperado 400 | real 400
+        esperado: field "limit", "limit must be an integer between 1 and 100"
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | limit=1.5 | esperado 400 | real 400
+        esperado: field "limit", "limit must be an integer between 1 and 100"
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | limit=-3 | esperado 400 | real 400
+        esperado: field "limit", "limit must be an integer between 1 and 100"
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | offset=-1 | esperado 400 | real 400
+        esperado: field "offset"
+        cuerpo:   {"errors":[{"field":"offset","message":"offset must be an integer of 0 or more"}]}
+OK    | offset=abc | esperado 400 | real 400
+        esperado: field "offset"
+        cuerpo:   {"errors":[{"field":"offset","message":"offset must be an integer of 0 or more"}]}
+OK    | favorite, category, sort y order inválidos | esperado 400 | real 400
+        esperado: 4 entradas: favorite, category, sort, order
+        cuerpo:   {"errors":[{"field":"favorite","message":"favorite must be true or false"},{"field":"category","message":"category must be one of: entrante, principal, postre, vegetariano, rapida"},{"field":"sort","message":"sort must be one of: id, title, minutes, favorite, category"},{"field":"order","message":"order must be asc or desc"}]}
+OK    | limit repetido | esperado 400 | real 400
+        esperado: field "limit"
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must appear only once"}]}
+OK    | search repetido | esperado 400 | real 400
+        esperado: field "search"
+        cuerpo:   {"errors":[{"field":"search","message":"search must appear only once"}]}
+OK    | search válido + limit=0 | esperado 400 | real 400
+        esperado: field "limit", sin array de recetas
+        cuerpo:   {"errors":[{"field":"limit","message":"limit must be an integer between 1 and 100"}]}
+OK    | el servidor sigue respondiendo | esperado 200 | real 200
+
+== 11. GET /recipes/stats ==
+OK    | forma del resumen | esperado 200 | real 200
+        esperado: total, favorites, averageMinutes numéricos; byCategory con entrante, principal, postre, vegetariano, rapida
+        cuerpo:   {"total":20,"favorites":7,"averageMinutes":54.6,"byCategory":{"entrante":2,"principal":5,"postre":7,"vegetariano":2,"rapida":4}}
+OK    | coherencia: colección | esperado 200 | real 200
+        esperado: total y favorites iguales a los de stats
+        cuerpo:   [{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal"},{"id":2,"title":"Gazpacho andaluz","minutes":15,"favorite":false,"category":"entrante"},{"id":3,"title":"Paella valenciana","minutes":90,"favorite":true,"category":"principal"},{"id":4,"title":"Crema catalana","minutes":30,"favorite":false,"category":"postre"},{"id":5,"title":"Ensalada de garbanzos","minutes":20,"favorite":false,"category":"vegetariano"},{"id":6,"title":"Tostada con tomate","minutes":5,"favorite":true,"category":"rapida"},{"title":"qa179260322622623 Pisto","minutes":40,"favorite":false,"category":"vegetariano","id":7},{"title":"qa179260322622623 Trim","minutes":10,"favorite":false,"category":"rapida","id":8},{"title":"qa179260322622623 Min","minutes":1,"favorite":false,"category":"rapida","id":9},{"title":"qa179260322622623 Max","minutes":600,"favorite":false,"category":"principal","id":10},{"title":"qa179260322622623 Ident","minutes":5,"favorite":false,"category":"rapida","id":11},{"title":"qa179260322622623 Leer","minutes":15,"favorite":false,"category":"entrante","id":12},{"title":"qa179260322622623 Put5","minutes":30,"favorite":false,"category":"principal","id":14},{"title":"qa179260322622623 Patch2","minutes":45,"favorite":false,"category":"postre","id":15},{"title":"qa179260322622623 CmpA","minutes":15,"favorite":false,"category":"postre","id":16},{"title":"qa179260322622623 CmpB","minutes":15,"favorite":true,"category":"postre","id":17},{"title":"qa179260322622623 Alfa","minutes":30,"favorite":true,"category":"postre","id":19},{"title":"qa179260322622623 Bravo","minutes":10,"favorite":false,"category":"postre","id":20},{"title":"qa179260322622623 Charlie","minutes":50,"favorite":true,"category":"principal","id":21},{"title":"qa179260322622623 Delta","minutes":20,"favorite":true,"category":"postre","id":22}]
+        jq {total:length, favorites:(map(select(.favorite))|length)}: {"total":20,"favorites":7}
+OK    | coherencia: stats | esperado 200 | real 200
+        esperado: sumaCat igual a total
+        cuerpo:   {"total":20,"favorites":7,"averageMinutes":54.6,"byCategory":{"entrante":2,"principal":5,"postre":7,"vegetariano":2,"rapida":4}}
+        jq {total, favorites, sumaCat:([.byCategory[]]|add)}: {"total":20,"favorites":7,"sumaCat":20}
+OK    | stats antes de crear (S0) | esperado 200 | real 200
+        esperado: [total, favorites, rapida]
+        cuerpo:   {"total":20,"favorites":7,"averageMinutes":54.6,"byCategory":{"entrante":2,"principal":5,"postre":7,"vegetariano":2,"rapida":4}}
+        jq [.total,.favorites,.byCategory.rapida]: [20,7,4]
+OK    | stats tras crear (S1) | esperado 200 | real 200
+        esperado: S0 con cada valor +1
+        cuerpo:   {"total":21,"favorites":8,"averageMinutes":80.5,"byCategory":{"entrante":2,"principal":5,"postre":7,"vegetariano":2,"rapida":5}}
+        jq [.total,.favorites,.byCategory.rapida]: [21,8,5]
+OK    | stats tras borrar (S2) | esperado 200 | real 200
+        esperado: igual a S0
+        cuerpo:   {"total":20,"favorites":7,"averageMinutes":54.6,"byCategory":{"entrante":2,"principal":5,"postre":7,"vegetariano":2,"rapida":4}}
+        jq [.total,.favorites,.byCategory.rapida]: [20,7,4]
+        S0=[20,7,4]  S1=[21,8,5]  S2=[20,7,4]
+
+== 12. Respuestas globales ==
+OK    | ruta inexistente | esperado 404 | real 404
+        esperado: {"error":"Route not found"}
+        cuerpo:   {"error":"Route not found"}
+
+Resumen de códigos: 84 OK, 0 FALLA
+Las líneas con 'cuerpo:' hay que revisarlas a mano comparándolas con 'esperado:'.
