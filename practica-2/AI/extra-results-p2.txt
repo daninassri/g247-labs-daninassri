@@ -1,0 +1,171 @@
+
+== 1. Forma de los cuerpos de error (ambigüedades 1 y 2) ==
+OK    | 1a 401 sin token | previsto 401 | real 401
+        previsto: {"error":"Authentication required"}
+        cuerpo:   {"error":"Authentication required"}
+OK    | 1b 401 token inválido | previsto 401 | real 401
+        previsto: {"error":"Invalid or expired token"}
+        cuerpo:   {"error":"Invalid or expired token"}
+OK    | 1c 403 receta ajena | previsto 403 | real 403
+        previsto: {"error":"Forbidden"}
+        cuerpo:   {"error":"Forbidden"}
+OK    | 1d 404 receta inexistente | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 1e 409 correo duplicado | previsto 409 | real 409
+        previsto: {"error":"Email already registered"}
+        cuerpo:   {"error":"Email already registered"}
+OK    | 2a 400 registro: forma {errors:[{field,message}]} | previsto 400 | real 400
+        previsto: errors con email y password
+        cuerpo:   {"errors":[{"field":"email","message":"email is required"},{"field":"password","message":"password is required"}]}
+OK    | 2b 400 acceso: misma forma | previsto 400 | real 400
+        previsto: errors con email y password
+        cuerpo:   {"errors":[{"field":"email","message":"email is required"},{"field":"password","message":"password is required"}]}
+
+== 3. Mensajes y orden de errors (ambigüedad 3) ==
+OK    | 3 orden = orden de los campos del esquema (title, minutes, favorite, category) | previsto 400 | real 400
+        previsto: campos en ese orden
+        cuerpo:   {"errors":[{"field":"title","message":"title must be a non-empty string"},{"field":"minutes","message":"minutes must be an integer between 1 and 600"},{"field":"favorite","message":"favorite must be true or false"},{"field":"category","message":"category must 
+OK    | 3 mensaje de minutes fuera de rango | previsto 400 | real 400
+        previsto: "minutes must be an integer between 1 and 600"
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+
+== 4. Precedencia entre errores (ambigüedad 4) ==
+OK    | 4a PUT con cuerpo inválido a receta inexistente: gana 404 | previsto 404 | real 404
+        previsto: 404
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 4b ajeno con cuerpo inválido: gana 403 | previsto 403 | real 403
+        previsto: 403
+        cuerpo:   {"error":"Forbidden"}
+OK    | 4c anónimo a id inexistente: gana 401 | previsto 401 | real 401
+        previsto: 401
+        cuerpo:   {"error":"Authentication required"}
+OK    | 4d JSON mal formado con token inexistente: gana 400 (el parser va antes) | previsto 400 | real 400
+        previsto: {"error":"Bad request"}
+        cuerpo:   {"error":"Bad request"}
+
+== 5. Ids mal formados (ambigüedad 5): todos 404 ==
+OK    | 5 GET /recipes/abc | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/0 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/-1 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/01 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/1.5 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/1e0 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/0x1 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+OK    | 5 GET /recipes/99999999999 | previsto 404 | real 404
+        previsto: {"error":"Recipe not found"}
+        cuerpo:   {"error":"Recipe not found"}
+
+== 6 y 7. PATCH atómico y PATCH sin campos válidos (ambigüedades 6 y 7) ==
+OK    | 6 PATCH con un campo válido y otro inválido: no aplica nada | previsto 400 | real 400
+        previsto: 400
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | 6 el título sigue igual | previsto 200 | real 200
+        previsto: título sin cambiar
+        cuerpo:   {"id":73,"title":"xc17956280951604 base","minutes":30,"favorite":true,"category":"postre","userId":2}
+OK    | 7a PATCH solo con id | previsto 400 | real 400
+        previsto: {"errors":[{"field":"body","message":"at least one field is required"}]}
+        cuerpo:   {"errors":[{"field":"body","message":"at least one field is required"}]}
+OK    | 7b PATCH solo con userId | previsto 400 | real 400
+        previsto: igual que 7a
+        cuerpo:   {"errors":[{"field":"body","message":"at least one field is required"}]}
+
+== 8 y 9. Título con espacios y conversión de tipos (ambigüedades 8 y 9) ==
+OK    | 8 título de solo espacios | previsto 400 | real 400
+        previsto: title must be a non-empty string
+        cuerpo:   {"errors":[{"field":"title","message":"title must be a non-empty string"}]}
+OK    | 9a minutes como texto | previsto 400 | real 400
+        previsto: minutes
+        cuerpo:   {"errors":[{"field":"minutes","message":"minutes must be an integer between 1 and 600"}]}
+OK    | 9b favorite como texto | previsto 400 | real 400
+        previsto: favorite
+        cuerpo:   {"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+OK    | 9c minutes 40.0 (el JSON lo lee como 40) | previsto 201 | real 201
+        previsto: minutes=40
+        cuerpo:   {"id":74,"title":"xc17956280951604 c","minutes":40,"favorite":false,"category":"rapida","userId":2}
+
+== 10 y 11. Mayúsculas y valores especiales (ambigüedades 10 y 11) ==
+OK    | 10a category con mayúscula en el cuerpo | previsto 400 | real 400
+        previsto: category
+        cuerpo:   {"errors":[{"field":"category","message":"category must be one of: entrante, principal, postre, vegetariano, rapida"}]}
+OK    | 10b favorite=TRUE | previsto 400 | real 400
+        previsto: favorite
+        cuerpo:   {"errors":[{"field":"favorite","message":"favorite must be true or false"}]}
+OK    | 10c order=DESC | previsto 400 | real 400
+        previsto: order
+        cuerpo:   {"errors":[{"field":"order","message":"order must be asc or desc"}]}
+OK    | 11a search vacío no filtra | previsto 200 | real 200
+        previsto: total igual que sin parámetro
+        cuerpo:   {"page":1,"limit":10,"total":32,"items":[{"id":1,"title":"Tortilla de patatas","minutes":45,"favorite":true,"category":"principal","userId":2},{"id":2,"title":"Gazpacho andaluz","minutes":15,"favorite":false,"category":"entrante","userId":2},{"id":3,"title":"P
+OK    | 11b Sort con mayúscula es un parámetro desconocido | previsto 400 | real 400
+        previsto: foo/Sort unknown
+        cuerpo:   {"errors":[{"field":"Sort","message":"unknown query parameter"}]}
+OK    | 11c search=% es literal (no comodín) | previsto 200 | real 200
+        previsto: total 0
+        cuerpo:   {"page":1,"limit":10,"total":0,"items":[]}
+OK    | 11d search=_ es literal | previsto 200 | real 200
+        previsto: total 0
+        cuerpo:   {"page":1,"limit":10,"total":0,"items":[]}
+
+== 12. Orden de favoritas (ambigüedad 12) ==
+OK    | 12a sort=favorite asc: false antes que true | previsto 200 | real 200
+        previsto: primero false
+        cuerpo:   {"page":1,"limit":100,"total":32,"items":[{"id":2,"title":"Gazpacho andaluz","minutes":15,"favorite":false,"category":"entrante","userId":2},{"id":4,"title":"Crema catalana","minutes":30,"favorite":false,"category":"postre","userId":2},{"id":5,"title":"Ensalad
+OK    | 12b sort=favorite desc: true antes que false | previsto 200 | real 200
+        previsto: primero true
+        cuerpo:   {"page":1,"limit":100,"total":32,"items":[{"id":73,"title":"xc17956280951604 base","minutes":30,"favorite":true,"category":"postre","userId":2},{"id":27,"title":"Gambas al ajillo","minutes":15,"favorite":true,"category":"entrante","userId":1},{"id":25,"title":
+        (12c) orden de títulos con tildes y mayúsculas, solo observado (depende del collation de PostgreSQL):
+        Zumo < avena < banana < xc17956280951604 < xc17956280951604 < Árbol < Ñoqui
+
+== 13 a 15. Campos desconocidos, correo y Location ==
+OK    | 13 campos desconocidos en el cuerpo se aceptan y se descartan | previsto 201 | real 201
+        previsto: sin color
+        cuerpo:   {"id":80,"title":"xc17956280951604 d","minutes":5,"favorite":false,"category":"rapida","userId":2}
+OK    | 14a correo con mayúsculas y espacios: se normaliza | previsto 201 | real 201
+        previsto: email en minúsculas y sin espacios
+        cuerpo:   {"id":21,"email":"xc17956280951604-mayus@example.com"}
+OK    | 14b el mismo correo con otra capitalización es duplicado | previsto 409 | real 409
+        previsto: 409
+        cuerpo:   {"error":"Email already registered"}
+OK    | 15 Location es relativa: /recipes/81
+
+== 16 y 17. Resumen, Content-Type y métodos ==
+OK    | 16 byCategory es un objeto con las cinco claves | previsto 200 | real 200
+        previsto: objeto
+        cuerpo:   {"total":39,"favorites":11,"averageMinutes":33.5,"byCategory":{"entrante":6,"principal":8,"postre":7,"vegetariano":5,"rapida":13}}
+OK    | 17a cuerpo sin Content-Type: se trata como vacío | previsto 400 | real 400
+        previsto: errors de title, minutes y category
+        cuerpo:   {"errors":[{"field":"title","message":"title is required"},{"field":"minutes","message":"minutes is required"},{"field":"category","message":"category is required"}]}
+OK    | 17b DELETE /recipes (método no definido) | previsto 404 | real 404
+        previsto: {"error":"Route not found"}
+        cuerpo:   {"error":"Route not found"}
+OK    | 17c POST /recipes/1 | previsto 404 | real 404
+        previsto: {"error":"Route not found"}
+        cuerpo:   {"error":"Route not found"}
+
+== 18. Borrar un usuario borra en cascada sus recetas (ambigüedad 18) ==
+OK    | 18 tras borrar al usuario, su receta ya no existe | previsto 404 | real 404
+        previsto: 404
+        cuerpo:   {"error":"Recipe not found"}
+
+== 19. Token caducado (ambigüedad 19; usa JWT_SECRET, así que no es caja negra) ==
+OK    | 19 token firmado y caducado | previsto 401 | real 401
+        previsto: {"error":"Invalid or expired token"}
+        cuerpo:   {"error":"Invalid or expired token"}
+Usuarios de prueba (xc17956280951604-*) borrados.
+
+Resumen: OK=48 FALLA=0
